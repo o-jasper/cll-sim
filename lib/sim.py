@@ -283,12 +283,13 @@ class Tx(object):
     def __repr__(self):
         return '<tx sender=%s value=%d fee=%d data=%s datan=%d>' % (self.sender, self.value, self.fee, self.data, self.datan)
 
-    def check(self, sender=None, recipient=None, value=0, datan=0, data=[]):
+    def check(self, sender=None, recipient=None, value=None, datan=None, data=None):
         testtrigger_equal_or_none("sender",    sender,    self.sender)
         testtrigger_equal_or_none("recipient", recipient, self.recipient)
         testtrigger_equal_or_none("value",     value,     self.value)
         testtrigger_equal_or_none("datan",     datan,     self.datan)
-        testtrigger_equal_or_none("claimed datan and array length",  datan, len(data))
+        if data != None:
+            testtrigger_equal_or_none("claimed datan and array length",  datan, len(data) )
         i = 0
         while i < datan:
             testtriger_equal("date element %s" % (i), data[i], self.data[i])
