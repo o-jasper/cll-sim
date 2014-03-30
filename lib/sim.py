@@ -189,8 +189,11 @@ class HLL(Contract):
         if txs != None:
             i = 1
             while i < len(txs):
-                self.txs.check(recipient=txs[i][0], value=txs[i][1],
-                               datan=txs[i][2], data=txs[i][3])
+                tx = tx[i]
+                if len(tx) >0: self.txs.check(recipient = tx[0])
+                if len(tx) >1: self.txs.check(value     = tx[1])
+                if len(tx) >2: self.txs.check(datan     = tx[2])
+                if len(tx) >3: self.txs.check(data      = tx[3])
                 i += 1
 
 class Simulation(object):
@@ -232,7 +235,7 @@ class Simulation(object):
 
         logging.info('-' * 20)
 
-    def check(self, stopped=None, txsn=None):
+    def check(self, stopped=None):
         testtrigger_equal_or_none("stopped", stopped, self.stopped)
 
 class Storage(object):
@@ -254,15 +257,17 @@ class Storage(object):
         return "<storage %s>" % repr(self._storage)
 
     def check_pair_1(self, index, should_be):
-        if self._storage[index] != should_be:
-            raise TestTrigger("storage at %s mismatch; %s vs %s" %
-                              (index, should_be, self._storage[index]))
+        testtrigger_equal("storage at %s mismatch;" % (index),
+                          should_be, self._storage[index])
 
     def check_pairs(self, pairs):
         i = 0
         while i < len(pairs):
             self.check_pair_1(pairs[i][0], pairs[i][1])
             i = i + 1
+    def check_zero(self, indexes):
+        for i in indexes:
+            testtrigger_equal("should be zero:", 0, self._storage[i])
 
 class Tx(object):
 
