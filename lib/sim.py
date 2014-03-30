@@ -37,7 +37,7 @@ class TestTrigger(RuntimeError):
 
 def testtrigger_equal(str, a, b):
     if a != b:
-        raise TestTrigger((str + " mismatch: %s vs %s") % (a,b))
+        raise TestTrigger(str + (" mismatch: %s vs %s") % (a,b))
 def testtrigger_equal_or_none(str, a, b):
     if a != None:
         testtrigger_equal(str, a, b)
@@ -189,11 +189,11 @@ class HLL(Contract):
         if txs != None:
             i = 1
             while i < len(txs):
-                tx = tx[i]
-                if len(tx) >0: self.txs.check(recipient = tx[0])
-                if len(tx) >1: self.txs.check(value     = tx[1])
-                if len(tx) >2: self.txs.check(datan     = tx[2])
-                if len(tx) >3: self.txs.check(data      = tx[3])
+                tx = txs[i]
+                if len(tx) >0: self.txs[i].check(recipient = tx[0])
+                if len(tx) >1: self.txs[i].check(value     = tx[1])
+                if len(tx) >2: self.txs[i].check(datan     = tx[2])
+                if len(tx) >3: self.txs[i].check(data      = tx[3])
                 i += 1
 
 class Simulation(object):
