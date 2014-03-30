@@ -157,9 +157,8 @@ class MarriageRun(Simulation):
         tx = Tx(sender=PARTNER_2, value=100, data=[TX_WITHDRAW, MERCHANT_ADDRESS, MERCHANT_AMOUNT])
         self.run(tx, self.contract)
 
-        assert len(self.contract.txs) == 1
-        assert self.contract.txs == [(MERCHANT_ADDRESS, MERCHANT_AMOUNT, 0, 0)]
         assert self.stopped == "Withdrawed"
+        self.contract.check(txsn=1, txs=[(MERCHANT_ADDRESS, MERCHANT_AMOUNT, 0, 0)])
 
     def test_divorce_request(self):
         tx = Tx(sender=PARTNER_1, value=100, data=[TX_DIVORCE])
@@ -176,9 +175,8 @@ class MarriageRun(Simulation):
         self.run(tx, self.contract, block)
 
         assert self.contract.storage[I_STATE] == S_DIVORCED
-        assert len(self.contract.txs) == 2
-        assert self.contract.txs == [(PARTNER_1, 500, 0, 0), (PARTNER_2, 500, 0, 0)]
         assert self.stopped == "Divorced"
+        self.contract.check(txsn=2, txs=[(PARTNER_1, 500, 0, 0), (PARTNER_2, 500, 0, 0)])
 
     def test_withdraw_after_divorce_fails(self):
         tx = Tx(sender=PARTNER_1, value=100, data=[TX_WITHDRAW, MERCHANT_ADDRESS, MERCHANT_AMOUNT])

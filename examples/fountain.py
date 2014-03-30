@@ -19,21 +19,19 @@ class FountainRun(Simulation):
     contract = Fountain()
 
     def test_insufficient_fee(self):
-        tx = Tx(sender='alice', value=10)
+        tx = Tx(sender="alice", value=10)
         self.run(tx, self.contract)
-        assert self.stopped == 'Insufficient fee'
+        self.check(stopped="Insufficient fee")
 
     def test_recipient_has_no_balance(self):
-        tx = Tx(sender='alice', value=2000, data=['bob'])
+        tx = Tx(sender="alice", value=2000, data=["bob"])
         block = Block()
         self.run(tx, self.contract, block)
-        assert len(self.contract.txs) == 1
-        assert self.contract.txs == [('bob', 1000, 0, 0)]
+        self.contract.check(txsn=1, txs=[("bob", 1000, 0, 0)])
 
     def test_recipient_has_balance(self):
-        tx = Tx(sender='alice', value=2000, data=['bob'])
+        tx = Tx(sender="alice", value=2000, data=["bob"])
         block = Block()
-        block.set_account_balance('bob', 1000)
+        block.set_account_balance("bob", 1000)
         self.run(tx, self.contract, block)
-        assert len(self.contract.txs) == 1
-        assert self.contract.txs == [('alice', 1000, 0, 0)]
+        self.contract.check(txsn=1, txs=[("alice", 1000, 0, 0)])

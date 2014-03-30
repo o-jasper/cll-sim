@@ -1,5 +1,5 @@
 from sim import Block, Contract, Simulation, Tx, mktx, stop
-from random import random
+from random import randrange
 import inspect
 
 # Constants to modify before contract creation.
@@ -90,7 +90,7 @@ class LockinEscrow(Contract):
         stop("Donation")
 
 def random_incentive():
-    return INCENTIVE*(0.1 + random())
+    return randrange(INCENTIVE/10,INCENTIVE)
 
 class LockinEscrowRun(Simulation):
 
@@ -111,14 +111,14 @@ class LockinEscrowRun(Simulation):
         self.run(Tx(value=value, sender=sender, data=data), self.contract, self.block,
                  method_name=inspect.stack()[1][3])
 
-    def test_donate(self, value=max(MIN_FEE, random()*TOTAL)):
+    def test_donate(self, value=max(MIN_FEE, randrange(TOTAL))):
         self.run_tx(sender="anyone", value=value)
-        assert self.stopped == "Donation"
+        self.check(stopped="Donation")
 
     def test_merchant_under_balance(self):
         self.contact = LockinEscrow()
-        self.run_tx(sender=MERCHANT, value=random()*MIN_BALANCE*0.9)
-        self.stopped == "Below funds of operation"
+        self.run_tx(sender=MERCHANT, value=randrange(MIN_FEE,(MIN_BALANCE-1)))
+        self.check(stopped="Below funds of operation")
 
     def test_merchant_allow(self):
         #Test intended when contract not busy.
@@ -129,41 +129,38 @@ class LockinEscrowRun(Simulation):
         self.total     = PRICE + self.incentive
         self.run_tx(sender=MERCHANT, value=MIN_BALANCE + MIN_FEE,
                     data=[C_ALLOW, CUSTOMER, self.total, self.incentive])
-        assert self.stopped == "Customer allowed"
-        assert self.contract.storage[I_CUSTOMER]  == CUSTOMER
-        assert self.contract.storage[I_TOTAL]     == self.total
-        assert self.contract.storage[I_INCENTIVE] == self.incentive
-        assert self.contract.storage[I_PAID]      == 0
+        self.check(stopped="Customer allowed")
+        self.contract.storage.check_pairs([(I_CUSTOMER,  CUSTOMER),
+                                           (I_TOTAL,  self.total),
+                                           (I_INCENTIVE, self.incentive),
+                                           (I_PAID,   0)])
 
     def test_customer_change_blocked(self):
         r_incentive = random_incentive()
         self.run_tx(sender=MERCHANT, value=MIN_BALANCE + MIN_FEE,
                     data=[C_ALLOW, CUSTOMER, 2*TOTAL, r_incentive])
-        assert self.stopped == "Customer change blocked"
-        assert self.contract.storage[I_TOTAL]     == self.total
-        assert self.contract.storage[I_INCENTIVE] == self.incentive
-
+        self.check(stopped="Customer change blocked")
+        self.contract.storage.check_pairs([(I_TOTAL,     self.total),
+                                           (I_INCENTIVE, self.incentive)])
+    
     def test_customer_pay(self):
-        self.paid = random()*PRICE
+        self.paid = randrange(PRICE)
         self.run_tx(sender=CUSTOMER, value=self.paid + MIN_FEE)
-        assert self.stopped == "Customer paid(part)"
+        self.check(stopped="Customer paid(part)")
 
     def test_customer_pay_too_little(self):
         self.reset()
         self.test_merchant_allow()
-        self.paid = random()*0.9*self.total
+        self.paid = randrange(self.total/2)
         self.run_tx(sender=CUSTOMER, value=self.paid + MIN_FEE, data=[C_SATISFIED])
-        assert self.stopped == "Customer didnt pay enough"
-        assert len(self.contract.txs) == 0
+        self.check(stopped="Customer didnt pay enough")
+        self.contract.check(txsn=0)
 
     def assert_reset(self):
-        assert self.contract.storage[I_CUSTOMER]  == 0
-        assert self.contract.storage[I_TOTAL]     == 0
-        assert self.contract.storage[I_INCENTIVE] == 0
-        assert self.contract.storage[I_PAID]      == 0
-
+        self.contract.storage.check_zero([I_CUSTOMER, I_TOTAL, I_INCENTIVE, I_PAID])
+    
     def assert_happy(self):
-        assert self.stopped == "Customer paid and happy"
+        self.check(stopped="Customer paid and happy")
         self.assert_reset()
 
     def test_customer_pay_and_happy(self):
@@ -171,34 +168,31 @@ class LockinEscrowRun(Simulation):
         self.test_merchant_allow()
         self.paid = self.total + 1
         self.run_tx(sender=CUSTOMER, value=self.paid + MIN_FEE, data=[C_SATISFIED])
-        assert self.contract.txs[0][0] == MERCHANT
-        assert self.contract.txs[0][1] == self.paid - self.incentive
-        assert self.contract.txs[1][0] == CUSTOMER
-        assert self.contract.txs[1][1] == self.incentive
         self.assert_happy()
+        self.contract.check(txsn=2, txs=[(MERCHANT, self.paid - self.incentive),
+                                         (CUSTOMER, self.incentive)])
 
     def test_customer_pay_part(self):
         self.assert_reset()
         self.test_merchant_allow()
         self.paid = self.total + 1
         self.run_tx(sender=CUSTOMER, value=self.paid + MIN_FEE)
-        assert self.stopped == "Customer paid(part)"  # (all, actually)
-        assert self.contract.storage[I_PAID] == self.total + 1
+        self.check(stopped="Customer paid(part)") # (all, actually))
+        self.contract.storage.check_pair_1(I_PAID, self.total+1)
 
     def test_customer_happy(self):  # depends on the pay one being run first.
         self.paid += 1
         self.run_tx(sender=CUSTOMER, value=MIN_FEE + 1, data=[C_SATISFIED])
-        assert self.contract.txs[0][0] == MERCHANT
-        assert self.contract.txs[0][1] == self.paid - self.incentive
-        assert self.contract.txs[1][0] == CUSTOMER
-        assert self.contract.txs[1][1] == self.incentive
         self.assert_happy()
+        self.contract.check(txsn=2, txs=[(MERCHANT, self.paid - self.incentive),
+                                         (CUSTOMER, self.incentive)])
+
 
     def test_refund(self):
         self.test_customer_pay_part()
         self.run_tx(sender=MERCHANT, value=MIN_FEE, data=[C_REFUND])
-        assert self.stopped == "Customer refunded"
-        assert self.contract.txs[0][0] == CUSTOMER
-        assert self.contract.txs[0][1] == min(self.paid*(1 + MIN_BALANCE/self.total),
-                                              self.total + MIN_BALANCE)
+        self.check(stopped="Customer refunded")
+        self.contract.check(txsn=1,
+                            txs=[(CUSTOMER, min(self.paid*(1 + MIN_BALANCE/self.total),
+                                                self.total + MIN_BALANCE))])
         self.assert_reset()

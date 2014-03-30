@@ -57,13 +57,12 @@ class HedgingRun(Simulation):
         block.contract_storage(self.contract.D)[self.contract.I] = 400
         tx = Tx(sender='bob', value=200)
         self.run(tx, self.contract, block)
-        assert len(self.contract.txs) == 1
-        assert self.contract.txs == [('bob', 5000 * 10 ** 18, 0, 0)]
+        self.contract.check(txsn=1, txs=[('bob', 5000 * 10 ** 18, 0, 0)])
 
     def test_ether_rises(self):
         block = Block(timestamp=self.ts_zero + 30 * 86400 + 1)
         block.contract_storage(self.contract.D)[self.contract.I] = 4000
         tx = Tx(sender='bob', value=200)
         self.run(tx, self.contract, block)
-        assert len(self.contract.txs) == 2
-        assert self.contract.txs == [('bob', 623 * 10 ** 18, 0, 0), ('alice', 4377 * 10 ** 18, 0, 0)]
+        self.contract.check(txsn=2, txs=[('bob', 623 * 10 ** 18, 0, 0),
+                                         ('alice', 4377 * 10 ** 18, 0, 0)])
