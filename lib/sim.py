@@ -264,11 +264,17 @@ class Storage(object):
         i = 0
         while i < len(pairs):
             self.check_pair_1(pairs[i][0], pairs[i][1])
-            i = i + 1
+            i += 1
 
     def check_zero(self, indexes):
         for i in indexes:
             testtrigger_equal("should be zero:", 0, self._storage[i])
+
+    def check_sequence(self, from_index, arr):
+        i =0
+        while i < len(arr):
+            self.check_pair_1(from_index + i, arr[i])
+            i += 1
 
 class Tx(object):
 
