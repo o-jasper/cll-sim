@@ -90,7 +90,7 @@ class LockinEscrow(Contract):
         stop("Donation")
 
 def random_incentive():
-    return randrange(INCENTIVE/10,INCENTIVE)
+    return randrange(INCENTIVE/10, INCENTIVE)
 
 class LockinEscrowRun(Simulation):
 
@@ -117,7 +117,7 @@ class LockinEscrowRun(Simulation):
 
     def test_merchant_under_balance(self):
         self.contact = LockinEscrow()
-        self.run_tx(sender=MERCHANT, value=randrange(MIN_FEE,(MIN_BALANCE-1)))
+        self.run_tx(sender=MERCHANT, value=randrange(MIN_FEE, MIN_BALANCE-1))
         self.check(stopped="Below funds of operation")
 
     def test_merchant_allow(self):
@@ -142,7 +142,7 @@ class LockinEscrowRun(Simulation):
         self.check(stopped="Customer change blocked")
         self.contract.storage.check_pairs([(I_TOTAL,     self.total),
                                            (I_INCENTIVE, self.incentive)])
-    
+
     def test_customer_pay(self):
         self.paid = randrange(PRICE)
         self.run_tx(sender=CUSTOMER, value=self.paid + MIN_FEE)
@@ -158,7 +158,7 @@ class LockinEscrowRun(Simulation):
 
     def assert_reset(self):
         self.contract.storage.check_zero([I_CUSTOMER, I_TOTAL, I_INCENTIVE, I_PAID])
-    
+
     def assert_happy(self):
         self.check(stopped="Customer paid and happy")
         self.assert_reset()
@@ -177,7 +177,7 @@ class LockinEscrowRun(Simulation):
         self.test_merchant_allow()
         self.paid = self.total + 1
         self.run_tx(sender=CUSTOMER, value=self.paid + MIN_FEE)
-        self.check(stopped="Customer paid(part)") # (all, actually))
+        self.check(stopped="Customer paid(part)")  # (all, actually))
         self.contract.storage.check_pair_1(I_PAID, self.total+1)
 
     def test_customer_happy(self):  # depends on the pay one being run first.
@@ -186,7 +186,6 @@ class LockinEscrowRun(Simulation):
         self.assert_happy()
         self.contract.check(txsn=2, txs=[(MERCHANT, self.paid - self.incentive),
                                          (CUSTOMER, self.incentive)])
-
 
     def test_refund(self):
         self.test_customer_pay_part()

@@ -37,20 +37,20 @@ class TestTrigger(RuntimeError):
 
 def testtrigger_equal(str, a, b):
     if a != b:
-        raise TestTrigger(str + (" mismatch: %s vs %s") % (a,b))
+        raise TestTrigger(str + (" mismatch: %s vs %s") % (a, b))
 def testtrigger_equal_or_none(str, a, b):
-    if a != None:
+    if a is not None:
         testtrigger_equal(str, a, b)
 
 class Block(object):
 
     def __init__(self, timestamp=0, difficulty= 2 ** 22, number=1, parenthash="parenthash"):
-        self.timestamp = timestamp
+        self.timestamp  = timestamp
         self.difficulty = difficulty
-        self.number = number
+        self.number     = number
         self.parenthash = parenthash
-        self._storages = defaultdict(Storage)
-        self._balances = defaultdict(int)
+        self._storages  = defaultdict(Storage)
+        self._balances  = defaultdict(int)
 
     def account_balance(self, account):
         if _is_called_by_contract():
@@ -186,14 +186,14 @@ class HLL(Contract):
     def check(self, txsn=None, txs=None):
         testtrigger_equal_or_none("number of outbound transactions",
                                   txsn, len(self.txs))
-        if txs != None:
+        if txs is not None:
             i = 1
             while i < len(txs):
-                tx = txs[i]
-                if len(tx) >0: self.txs[i].check(recipient = tx[0])
-                if len(tx) >1: self.txs[i].check(value     = tx[1])
-                if len(tx) >2: self.txs[i].check(datan     = tx[2])
-                if len(tx) >3: self.txs[i].check(data      = tx[3])
+                L = len(txs[i])
+                self.txs[i].check(recipient=(txs[i][0] if L > 0 else None),
+                                  value    =(txs[i][1] if L > 1 else None),
+                                  datan    =(txs[i][2] if L > 2 else None),
+                                  data     =(txs[i][3] if L > 3 else None))
                 i += 1
 
 class Simulation(object):
@@ -265,6 +265,7 @@ class Storage(object):
         while i < len(pairs):
             self.check_pair_1(pairs[i][0], pairs[i][1])
             i = i + 1
+
     def check_zero(self, indexes):
         for i in indexes:
             testtrigger_equal("should be zero:", 0, self._storage[i])
@@ -288,9 +289,9 @@ class Tx(object):
         testtrigger_equal_or_none("recipient", recipient, self.recipient)
         testtrigger_equal_or_none("value",     value,     self.value)
         testtrigger_equal_or_none("datan",     datan,     self.datan)
-        if data != None:
-            testtrigger_equal_or_none("claimed datan and array length",  datan, len(data) )
+        if data is not None:
+            testtrigger_equal_or_none("claimed datan and array length",  datan, len(data))
         i = 0
         while i < datan:
-            testtriger_equal("date element %s" % (i), data[i], self.data[i])
+            testtrigger_equal("date element %s" % (i), data[i], self.data[i])
             i = i + 1

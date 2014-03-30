@@ -1,4 +1,4 @@
-from sim import Block, Contract, Simulation, Tx, mktx, stop, logging
+from sim import Block, Contract, Simulation, Tx, mktx, stop
 
 # Constants to modify before contract creation
 MERCHANT = "mike"
