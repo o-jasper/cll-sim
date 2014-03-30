@@ -1,4 +1,4 @@
-from sim import Block, Contract, Tx, Simulation, stop
+from sim import Block, Contract, Tx, Simulation, stop, mktx, array
 from random import randrange
 import inspect, logging, imp
 
@@ -67,7 +67,12 @@ class TransactionExchange(Contract):
                     stop("Too few arguments")
                 if contract.storage[I_BLOCK + tx.data[1]] and contract.storage[I_BLOCK + tx.data[1]] < block.number:
                     stop("Blocked")
-                mktx(tx.data[1], tx.data[2], len(tx.data-3), tx.data[2:])
+                arr = array(tx.datan - 3)
+                i = 3
+                while i < tx.datan:
+                    arr[i-3] = tx.data[i]
+                    i = i + 1
+                mktx(tx.data[1], tx.data[2], tx.datan - 3, arr)
                 stop("Sent direct")
 
             if tx.data[0] == C_CAGE:
@@ -101,7 +106,7 @@ class TransactionExchange(Contract):
                 stop("Wrong secret")
             if contract.storage[on_storage + 1] != release_addr:
                 stop("Oh dear")
-            arr = []
+            arr = array(L-5)
             value = contract.storage[on_storage + 4]
             i = 0
             while i < L: #Free and create the data to send.
@@ -132,25 +137,25 @@ class TransactionExchangeRun(Simulation):
                  method_name=inspect.stack()[1][3])
 
     def test_insufficient_fee(self):
-        self.run_tx(self.alice, sender=random_person(), value=(MIN_FEE - 1))
-        assert self.stopped == "Insufficient fee"
+        self.run_tx(self.alice, sender=random_person(), value=MIN_FEE - 1)
+        self.check(stopped="Insufficient fee")
 
     def test_donate(self):
-        self.run_tx(self.alice, sender=random_person(), value=MIN_FEE)
-        assert self.stopped == "Donation"
+        self.run_tx(self.alice, sender=random_person(), value=MIN_FEE + 1)
+        logging.info(self.stopped)
+        self.check(stopped="Donation")
 
     def test_donate_wrong_user(self):
         self.run_tx(self.alice, sender="anyone", value=MIN_FEE,
                     data=rand_arr([[C_SEND], [C_CAGE]]))
-        assert self.stopped == "Donation"
+        self.check(stopped="Donation")
     
     def test_send_direct(self):
-        self.run_tx(self.alice, sender="alice", value=MIN_FEE+4253,
-                    data=[C_SEND, sha3("crypto_gods"), 9000, sha3("worship")])
-        logging.info(self.alice.owner)
-        logging.info(self.stopped)
-        assert self.stopped == "Sent direct"
-        txs = self.alice.txs
-        assert len(txs) == 1 and txs[0] == "crypto_gods"
-        assert txs[2] == 9000
-        assert txs[3] == 1 and txs[1] == "worship"
+        crypto_gods = randrange(100000)
+        worship     = randrange(100000)
+        self.run_tx(self.alice, sender="alice", value=MIN_FEE + randrange(10),
+                    data=[C_SEND, crypto_gods, 9000, worship])
+        self.check(stopped="Sent direct")
+        self.alice.check(txsn=1)
+        self.alice.txs[0].check(sender=self.alice.address, recipient=crypto_gods,
+                                value=9000, datan=1, data=[worship])

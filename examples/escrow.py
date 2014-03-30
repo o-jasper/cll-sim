@@ -1,4 +1,4 @@
-from sim import Block, Contract, Simulation, Tx, mktx, stop
+from sim import Block, Contract, Simulation, Tx, mktx, stop, logging
 
 # Constants to modify before contract creation
 MERCHANT = "mike"
@@ -86,7 +86,7 @@ class EscrowRun(Simulation):
         tx = Tx(sender=CUSTOMER, value=10)
         self.run(tx, contract)
 
-        assert self.stopped == 'Insufficient fee'
+        self.check(stopped="Insufficient fee")
 
     def test_customer_paid(self):
         contract = Escrow()
@@ -95,10 +95,11 @@ class EscrowRun(Simulation):
         block = Block(timestamp=TS)
         self.run(tx, contract, block)
 
-        assert contract.storage[I_STATUS] == S_CUSTOMER_PAID
-        assert contract.storage[I_CUSTOMER_ADDRESS] == CUSTOMER
-        assert contract.storage[I_CUSTOMER_PAID_AMOUNT] == PRICE_ETHER
-        assert contract.storage[I_CUSTOMER_PAID_TS] == TS
+        contract.storage.check_pairs(
+           [(I_STATUS,               S_CUSTOMER_PAID),
+            (I_CUSTOMER_ADDRESS,     CUSTOMER),
+            (I_CUSTOMER_PAID_AMOUNT, PRICE_ETHER),
+            (I_CUSTOMER_PAID_TS,     TS)])
 
     def test_shipped(self):
         contract = Escrow()
@@ -111,9 +112,9 @@ class EscrowRun(Simulation):
         block = Block(timestamp=TS + 1)
         self.run(tx, contract, block)
 
-        assert contract.storage[I_STATUS] == S_SHIPPED
-        assert len(contract.txs) == 1
-        assert contract.txs == [(MERCHANT, PRICE_ETHER, 0, 0)]
+        contract.storage.check_pair_1(I_STATUS, S_SHIPPED)
+
+        contract.check(txsn=1, txs=[(MERCHANT, PRICE_ETHER, 0, 0)])
 
     def test_confirmation_timeout(self):
         contract = Escrow()
@@ -126,6 +127,5 @@ class EscrowRun(Simulation):
         block = Block(timestamp=TS + CONFIRMATION_TIMEOUT + 1)
         self.run(tx, contract, block)
 
-        assert contract.storage[I_STATUS] == S_REFUNDED
-        assert len(contract.txs) == 1
-        assert contract.txs == [(CUSTOMER, PRICE_ETHER, 0, 0)]
+        contract.storage.check_pair_1(I_STATUS, S_REFUNDED)
+        contract.check(txsn=1, txs=[(CUSTOMER, PRICE_ETHER, 0, 0)])

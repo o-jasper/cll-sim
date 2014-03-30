@@ -19,18 +19,28 @@ def _is_called_by_contract():
     caller_class = self.__class__
     return Contract in caller_class.__bases__
 
-def mktx(recipient, amount, datan, data):
-    self = _infer_self()
-    logging.info("Sending tx to %s of %s" % (recipient, amount))
-    self.txs.append((recipient, amount, datan, data))
-
 def stop(reason):
     raise Stop(reason)
 
 def array(n):
     return [None] * n
 
+def mktx(recipient, amount, datan, data):
+    self = _infer_self()
+    logging.info("Sending tx to %s of %s" % (recipient, amount))
+    self.txs.append(Tx(recipient=recipient, value=amount, datan=datan, data=data))
+
 log = logging.info
+
+class TestTrigger(RuntimeError):
+    pass
+
+def testtrigger_equal(str, a, b):
+    if a != b:
+        raise TestTrigger((str + " mismatch: %s vs %s") % (a,b))
+def testtrigger_equal_or_none(str, a, b):
+    if a != None:
+        testtrigger_equal(str, a, b)
 
 class Block(object):
 
@@ -62,7 +72,6 @@ class Block(object):
 
 class Stop(RuntimeError):
     pass
-
 
 class Contract(object):
 
@@ -174,6 +183,16 @@ class HLL(Contract):
         h = closure_module.HLL()
         h.run(tx, contract, block)
 
+    def check(self, txsn=None, txs=None):
+        testtrigger_equal_or_none("number of outbound transactions",
+                                  txsn, len(self.txs))
+        if txs != None:
+            i = 1
+            while i < len(txs):
+                self.txs.check(recipient=txs[i][0], value=txs[i][1],
+                               datan=txs[i][2], data=txs[i][3])
+                i += 1
+
 class Simulation(object):
 
     def __init__(self):
@@ -210,8 +229,11 @@ class Simulation(object):
             else:
                 logging.info("Stopped")
                 self.stopped = True
+
         logging.info('-' * 20)
 
+    def check(self, stopped=None, txsn=None):
+        testtrigger_equal_or_none("stopped", stopped, self.stopped)
 
 class Storage(object):
 
@@ -231,15 +253,38 @@ class Storage(object):
     def __repr__(self):
         return "<storage %s>" % repr(self._storage)
 
+    def check_pair_1(self, index, should_be):
+        if self._storage[index] != should_be:
+            raise TestTrigger("storage at %s mismatch; %s vs %s" %
+                              (index, should_be, self._storage[index]))
+
+    def check_pairs(self, pairs):
+        i = 0
+        while i < len(pairs):
+            self.check_pair_1(pairs[i][0], pairs[i][1])
+            i = i + 1
 
 class Tx(object):
 
-    def __init__(self, sender=None, value=0, fee=0, data=[]):
+    def __init__(self, sender=None, recipient=None, value=0, fee=0,
+                 data=[], datan=None):
         self.sender = sender
+        self.recipient  = recipient
         self.value = value
         self.fee = fee
         self.data = data
-        self.datan = len(data)
+        self.datan = (len(data) if datan is None else datan)
 
     def __repr__(self):
         return '<tx sender=%s value=%d fee=%d data=%s datan=%d>' % (self.sender, self.value, self.fee, self.data, self.datan)
+
+    def check(self, sender=None, recipient=None, value=0, datan=0, data=[]):
+        testtrigger_equal_or_none("sender",    sender,    self.sender)
+        testtrigger_equal_or_none("recipient", recipient, self.recipient)
+        testtrigger_equal_or_none("value",     value,     self.value)
+        testtrigger_equal_or_none("datan",     datan,     self.datan)
+        testtrigger_equal_or_none("claimed datan and array length",  datan, len(data))
+        i = 0
+        while i < datan:
+            testtriger_equal("date element %s" % (i), data[i], self.data[i])
+            i = i + 1
