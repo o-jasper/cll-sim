@@ -2,9 +2,10 @@ from sim import Block, Contract, Tx, Simulation, stop, mktx, array
 from random import randrange
 import inspect, logging, imp
 from hashlib import md5
+import logging
 
 def sha3(x):
-    md5(x)
+    md5("%s" % x)
 
 # From user.
 C_SEND    = 1 # Send immediately.
@@ -70,7 +71,6 @@ class TransactionExchange(Contract):
 
     If anyone figures out how to have a seamless
     """
-
     
     def init(owner="pete"):
         return owner
@@ -119,12 +119,12 @@ class TransactionExchange(Contract):
             L = contract.storage[on_storage]
             if L == 0:
                 stop("Nothing to release")
-            if contract.storage[on_storage + 2] >= block.number:
+            if contract.storage[on_storage + 2] <= block.number:
                 n = L - 1
                 while n >= 0: #Free it.
                     contract.storage[on_storage + n] = 0
                     n = n - 1
-                stop("Too late")
+                stop("Expired")
             if contract.storage[on_storage + 3] != sha3(tx.data[1]):
                 stop("Wrong secret")
             if contract.storage[on_storage + 1] != release_addr:
@@ -223,5 +223,13 @@ class TransactionExchangeRun(Simulation):
         self.bob.storage.check_sequence(I_BLOCK + SUBCURRENCY,
                                          [11, SUBCURRENCY, 5, self.h_s, value,
                                           ALICE, subcurrency_coins])
-    
-    
+
+    def test_alice_release(self):
+        logging.info(self.block.number)
+        logging.info(self.alice.storage[I_BLOCK + BOB + 2])
+        
+        self.run_tx(self.alice, sender=random_person(), value=MIN_FEE,
+                    data=[C_RELEASE, BOB])
+        self.check(stopped="Released")
+        self.alice.storage.check_pair_1(I_LOCKED, 0)
+        self.alice.storage.check_sequence(I_BLOCK + BOB, [0]*10)
