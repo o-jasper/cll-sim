@@ -156,6 +156,4 @@ class TransactionExchangeRun(Simulation):
         self.run_tx(self.alice, sender="alice", value=MIN_FEE + randrange(10),
                     data=[C_SEND, crypto_gods, 9000, worship])
         self.check(stopped="Sent direct")
-        self.alice.check(txsn=1)
-        self.alice.txs[0].check(sender=self.alice.address, recipient=crypto_gods,
-                                value=9000, datan=1, data=[worship])
+        self.alice.check(txsn=1, txs=[(crypto_gods, 9000, 1, worship)])

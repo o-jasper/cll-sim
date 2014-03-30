@@ -64,5 +64,5 @@ class HedgingRun(Simulation):
         block.contract_storage(self.contract.D)[self.contract.I] = 4000
         tx = Tx(sender='bob', value=200)
         self.run(tx, self.contract, block)
-        self.contract.check(txsn=2, txs=[('bob', 623 * 10 ** 18, 0, 0),
-                                         ('alice', 4377 * 10 ** 18, 0, 0)])
+        self.contract.check(txsn=2, txs=[('bob',   623 * 10 ** 18,  0),
+                                         ('alice', 4377 * 10 ** 18, 0)])

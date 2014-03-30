@@ -154,7 +154,8 @@ class MarriageRun(Simulation):
         assert self.stopped == "Withdraw requested"
 
     def test_withdraw_approval(self):
-        tx = Tx(sender=PARTNER_2, value=100, data=[TX_WITHDRAW, MERCHANT_ADDRESS, MERCHANT_AMOUNT])
+        tx = Tx(sender=PARTNER_2, value=100,
+                data=[TX_WITHDRAW, MERCHANT_ADDRESS, MERCHANT_AMOUNT])
         self.run(tx, self.contract)
 
         assert self.stopped == "Withdrawed"
@@ -179,7 +180,8 @@ class MarriageRun(Simulation):
         self.contract.check(txsn=2, txs=[(PARTNER_1, 500, 0, 0), (PARTNER_2, 500, 0, 0)])
 
     def test_withdraw_after_divorce_fails(self):
-        tx = Tx(sender=PARTNER_1, value=100, data=[TX_WITHDRAW, MERCHANT_ADDRESS, MERCHANT_AMOUNT])
+        tx = Tx(sender=PARTNER_1, value=100,
+                data=[TX_WITHDRAW, MERCHANT_ADDRESS, MERCHANT_AMOUNT])
         self.run(tx, self.contract)
 
         assert self.contract.storage[I_WITHDRAW_TO] == 0
