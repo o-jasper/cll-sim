@@ -1,11 +1,9 @@
 from sim import Block, Contract, Tx, Simulation, stop, mktx, array
 from random import randrange
-import inspect, logging, imp
-from hashlib import md5
-import logging
+import inspect
 
-def sha3(x):
-    md5("%s" % x)
+def sha3(x): #A placeholder, obviously!
+    return x*x
 
 # From user.
 C_SEND    = 1 # Send immediately.
@@ -68,8 +66,6 @@ class TransactionExchange(Contract):
     that a third party not knowing R is none the wiser.
 
     There are probably other approaches..
-
-    If anyone figures out how to have a seamless
     """
     
     def init(owner="pete"):
@@ -87,7 +83,7 @@ class TransactionExchange(Contract):
                     stop("Too few arguments")
                 if contract.storage[I_LOCKED] > block.account_balance(contract.address) - tx.data[2]:
                     stop("Not enough left for obligations")
-                if contract.storage[I_BLOCK + tx.data[1]] and contract.storage[I_BLOCK + tx.data[1]] < block.number:
+                if contract.storage[I_BLOCK + tx.data[1]] and block.number < contract.storage[I_BLOCK + tx.data[1] + 2]:
                     stop("Blocked")
                 arr = array(tx.datan - 3)
                 i = 3
@@ -112,35 +108,39 @@ class TransactionExchange(Contract):
                     i = i + 1
                 stop("Caged a transaction")
 
-        if tx.datan == 2 and tx.data[0] == C_RELEASE:
+        if tx.datan == 3 and tx.data[0] == C_RELEASE:
 
             release_addr = tx.data[1]
             on_storage = I_BLOCK + release_addr
             L = contract.storage[on_storage]
             if L == 0:
-                stop("Nothing to release")
-            if contract.storage[on_storage + 2] <= block.number:
-                n = L - 1
-                while n >= 0: #Free it.
-                    contract.storage[on_storage + n] = 0
-                    n = n - 1
-                stop("Expired")
-            if contract.storage[on_storage + 3] != sha3(tx.data[1]):
+                stop("No caged transaction")
+            if contract.storage[on_storage + 3] != sha3(tx.data[2]):
                 stop("Wrong secret")
             if contract.storage[on_storage + 1] != release_addr:
                 stop("Oh dear")
             arr = array(L-5)
+            expire_n = contract.storage[on_storage + 2]
             value = contract.storage[on_storage + 4]
             i = 0
-            while i < L: #Free and create the data to send.
+            while i < L: # Free and create the data to send.
                 if i >= 5:
-                    arr[i-5] = contract.storage[i]
-                contract.storage[i] = 0
+                    arr[i-5] = contract.storage[on_storage + i]
+                contract.storage[on_storage + i] = 0
                 i = i + 1
+            contract.storage[I_LOCKED] -= value
+
+            if expire_n <= block.number:
+                stop("Too late")
+
             mktx(release_addr, value, L - 5, arr)
-            contract.storage[I_LOCKED] -= tx.value
             stop("Released")
         stop("Donation")
+
+    def lock_gone(self, whom, n, still_locked=0):
+        self.storage.check_pair_1(I_LOCKED, still_locked)
+        self.storage.check_sequence(I_BLOCK + whom, [0]*n)
+
 
 def rand_arr(arr):
     return arr[randrange(len(arr))]
@@ -151,6 +151,7 @@ def random_person():
 ALICE       = 231
 BOB         = 232
 SUBCURRENCY = 233
+BOB_SUBCURRENCY_ESCAPE = 234
 
 class TransactionExchangeRun(Simulation):
     alice = TransactionExchange()
@@ -159,7 +160,6 @@ class TransactionExchangeRun(Simulation):
     bob.owner = "bob"
 #
 #    currency = SubCurrency()
-    
     block = Block(number=1)
 
     def run_tx(self, contract, value=0, sender="", data=[]):
@@ -172,7 +172,6 @@ class TransactionExchangeRun(Simulation):
 
     def test_donate(self):
         self.run_tx(self.alice, sender=random_person(), value=MIN_FEE + 1)
-        logging.info(self.stopped)
         self.check(stopped="Donation")
 
     def test_donate_wrong_user(self):
@@ -200,18 +199,17 @@ class TransactionExchangeRun(Simulation):
         self.alice.check(txsn=0)
         self.alice.storage[I_LOCKED]= 0        
 
-    s   = "SUPER SECRET"
+    s   = randrange(10000)
     h_s = sha3(s)
     def test_alice_cage(self):
         value = 6000
         self.run_tx(self.alice, sender="alice", value=MIN_FEE,
-                    data=[C_CAGE, BOB, 5, self.h_s, value,
-                           "payment for bob sending currency coins"])
+                    data=[C_CAGE, BOB, 5, self.h_s, value, "payment"])
         self.check(stopped="Caged a transaction")
         self.alice.storage.check_pair_1(I_LOCKED, value)
         self.alice.storage.check_sequence(I_BLOCK + BOB,
                                           [10, BOB, 5, self.h_s, value,
-                                           "payment for bob sending currency coins"])
+                                           "payment"])
 
     def test_bob_cage(self):
         value = 1000*self.block.basefee
@@ -225,11 +223,54 @@ class TransactionExchangeRun(Simulation):
                                           ALICE, subcurrency_coins])
 
     def test_alice_release(self):
-        logging.info(self.block.number)
-        logging.info(self.alice.storage[I_BLOCK + BOB + 2])
-        
         self.run_tx(self.alice, sender=random_person(), value=MIN_FEE,
-                    data=[C_RELEASE, BOB])
+                    data=[C_RELEASE, BOB, self.s])
         self.check(stopped="Released")
-        self.alice.storage.check_pair_1(I_LOCKED, 0)
-        self.alice.storage.check_sequence(I_BLOCK + BOB, [0]*10)
+        self.alice.check(txsn=1, txs=[(ALICE, 6000, 1, ["payment"])])
+        self.alice.lock_gone(BOB, 10)
+
+    def test_bob_release(self):
+        self.run_tx(self.bob, sender=random_person(), value=MIN_FEE,
+                    data=[C_RELEASE, SUBCURRENCY, self.s])
+        self.check(stopped="Released")
+        self.bob.check(txsn=1, txs=[(SUBCURRENCY, 6000, 2, [ALICE, 1000])])
+        self.bob.lock_gone(SUBCURRENCY, 11)
+
+    def test_alice_too_late(self):
+        self.test_alice_cage()
+        self.block.number = 10
+        self.run_tx(self.alice, sender=random_person(), value=MIN_FEE,
+                    data=[C_RELEASE, BOB, self.s])
+        self.check(stopped="Too late")
+        self.alice.lock_gone(BOB, 11)
+
+    def test_alice_wrong_secret(self):
+        self.test_alice_cage()
+        self.block.number = 0
+        self.run_tx(self.alice, sender=random_person(), value=MIN_FEE,
+                    data=[C_RELEASE, BOB, 35235])
+        self.check(stopped="Wrong secret")
+
+    def test_alice_release_wrong_address(self):
+        self.run_tx(self.alice, sender=random_person(), value=MIN_FEE,
+                    data=[C_RELEASE, rand_arr([ALICE,10]), 35235])
+        self.check(stopped="No caged transaction")
+
+    #What if Bob is evil and tries to empty the subcurrency account before
+    # Bob can reach?
+    def test_bob_steal(self):
+        self.test_bob_cage()
+        self.block.set_account_balance(self.bob.address,10000)
+        self.run_tx(self.bob, sender="bob", value=MIN_FEE,
+                    data=[C_SEND, SUBCURRENCY, BOB_SUBCURRENCY_ESCAPE, 2000])
+        self.check(stopped="Blocked")
+
+    def test_too_few_argumets(self):
+        self.run_tx(self.alice, sender="alice", value=MIN_FEE,
+                    data=[C_SEND, 1])
+        self.check(stopped="Too few arguments")
+        self.run_tx(self.alice, sender="alice", value=MIN_FEE,
+                    data=[C_CAGE, 1, 2, 3])
+        self.check(stopped="Too few arguments")
+        
+# TODO split up actions and test of results?
